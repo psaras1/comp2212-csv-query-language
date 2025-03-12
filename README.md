@@ -38,3 +38,4 @@ stack build
 
 # Run the executable
 stack exec comp2212-csv-query-language-exe
+```
