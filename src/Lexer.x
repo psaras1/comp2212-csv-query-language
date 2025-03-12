@@ -39,6 +39,7 @@ tokens :-
   RENAME                        { \p s -> PT p TokenRename }
   CREATE                        { \p s -> PT p TokenCreate }
   PROJECT                       { \p s -> PT p TokenProject }
+  COLREF                        { \p s -> PT p TokenColRef }
   
   -- CSV-specific functions and operations
   BY                            { \p s -> PT p TokenBy }
@@ -67,6 +68,7 @@ tokens :-
   ">="                          { \p s -> PT p TokenGreaterEq }
   "<="                          { \p s -> PT p TokenLessEq }
   "!="                          { \p s -> PT p TokenNotEq }
+  "#"                           { \p s -> PT p TokenHash }
   
   -- Identifiers and literals
   $alpha [$alphaNum\_]*         { \p s -> PT p (TokenIdentifier s) }
@@ -107,6 +109,7 @@ data Token =
   TokenRename |
   TokenCreate |
   TokenProject |
+  TokenColRef |
   
   -- CSV-specific functions and operations
   TokenBy |
@@ -135,6 +138,7 @@ data Token =
   TokenGreaterEq |
   TokenLessEq |
   TokenNotEq |
+  TokenHash |
   
   -- Identifiers and literals
   TokenIdentifier String |

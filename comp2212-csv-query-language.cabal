@@ -28,6 +28,7 @@ library
       CSV
       Lexer
       Lib
+      Parser
   other-modules:
       Paths_comp2212_csv_query_language
   autogen-modules:
