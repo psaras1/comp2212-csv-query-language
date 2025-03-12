@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      CSV
       Lib
   other-modules:
       Paths_comp2212_csv_query_language
@@ -36,6 +37,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , containers
   default-language: Haskell2010
   build-tool-depends:
     alex:alex,
@@ -54,6 +56,7 @@ executable comp2212-csv-query-language-exe
       array
     , base >=4.7 && <5
     , comp2212-csv-query-language
+    , containers
   default-language: Haskell2010
 
 test-suite comp2212-csv-query-language-test
@@ -70,4 +73,5 @@ test-suite comp2212-csv-query-language-test
       array
     , base >=4.7 && <5
     , comp2212-csv-query-language
+    , containers
   default-language: Haskell2010
