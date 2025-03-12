@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       CSV
+      Lexer
       Lib
   other-modules:
       Paths_comp2212_csv_query_language
