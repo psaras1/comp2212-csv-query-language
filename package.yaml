@@ -1,25 +1,22 @@
-name:       comp2212-csv-query-language
-version:    0.1.0.0
-github:     "githubuser/comp2212-csv-query-language"
-license:    BSD-3-Clause
-author:     "Author name here"
+name: comp2212-csv-query-language
+version: 0.1.0.0
+github: "githubuser/comp2212-csv-query-language"
+license: BSD-3-Clause
+author: "Author name here"
 maintainer: "example@example.com"
-copyright:  "2025 Author name here"
-
+copyright: "2025 Author name here"
 extra-source-files:
 - README.md
 - CHANGELOG.md
 
-# Metadata used when publishing your package:
-# synopsis: Short description of your package
-# category: Web
-
-description: Alex and Happy project.
+description: A domain-specific language for querying CSV files
 
 dependencies:
 - base >= 4.7 && < 5
 - array
 - containers
+- directory
+- mtl
 
 ghc-options:
 - -Wall
@@ -34,6 +31,11 @@ ghc-options:
 
 library:
   source-dirs: src
+  exposed-modules:
+    - CSV
+    - Lexer
+    - Parser
+    - Interpreter
   verbatim: |
     build-tool-depends:
       alex:alex,
@@ -41,7 +43,7 @@ library:
 
 executables:
   comp2212-csv-query-language-exe:
-    main:        Main.hs
+    main: Main.hs
     source-dirs: app
     ghc-options:
     - -threaded
@@ -52,7 +54,7 @@ executables:
 
 tests:
   comp2212-csv-query-language-test:
-    main:        Spec.hs
+    main: Spec.hs
     source-dirs: test
     ghc-options:
     - -threaded

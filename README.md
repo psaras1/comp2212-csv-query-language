@@ -1,41 +1,71 @@
-# COMP2212 CSV Query Language
+# CSV Query Language (CQL)
 
-A domain-specific programming language for querying CSV documents, developed as coursework for COMP2212 Programming Language Concepts.
+A domain-specific programming language for querying CSV files.
 
-## Group Members
+## Overview
 
-1. **[Constantinos Psaras]** - [cp2n23]
-2. **[Fatema Waly]** - [fmew1e22]
-3. **[Khudeja Begum]** - [kb1n22]
+This language provides a SQL-inspired syntax for querying and manipulating CSV data. 
+The interpreter reads queries written in CQL, processes CSV files, and outputs the results.
 
-## Project Overview
+## Features
 
-Goal - Create a custom query language for CSV files that allows users to:
-- Filter and select data from CSV files
-- Perform operations like cartesian product, projection, and joins
-- Transform and manipulate data
-- Output results in CSV format
+- Cartesian product of tables
+- Selection and filtering of rows
+- Permutation and projection of columns
+- Existence checks on column values
+- Left merge of tables
+- Support for constants and copying values
 
-Our language is implemented in Haskell and uses Alex for lexical analysis and Happy for parsing.
+## Building
 
-## Installation
-
-### Requirements
-- GHC (Glasgow Haskell Compiler)
-- Stack (Haskell Tool Stack)
-- Alex (lexer generator)
-- Happy (parser generator)
-
-### Setup
+To build the project, you need GHC, Alex, and Happy installed.
 
 ```bash
-# Clone the repository
-git clone https://github.com/[your-github-username]/comp2212-csv-query-language.git
-cd comp2212-csv-query-language
-
-# Build the project
+# Using stack
 stack build
 
-# Run the executable
-stack exec comp2212-csv-query-language-exe
+# Using cabal
+cabal build
 ```
+
+## Usage
+
+```bash
+# Run a query file
+cql t1.cql
+
+# The program will look for CSV files in the current directory
+# based on table names referenced in the query.
+```
+
+## Syntax Examples
+
+```sql
+-- Cartesian product of A and B
+CARTESIAN PRODUCT A, B;
+
+-- Select specific columns with a condition
+SELECT #1, #3 FROM A WHERE #2 = "value";
+
+-- Perform a permutation with matching condition
+PERMUTE #3, #1 FROM A WHERE MATCH #1 #2;
+
+-- Check for non-empty values in column 2
+EXISTS COL #2 FROM A;
+
+-- Copy a column with a constant value in between
+COPY #1 WITH CONSTANT "foo" FROM A;
+
+-- Left merge two tables on the first column
+LEFT MERGE P ON #1 WITH Q;
+```
+
+## Tasks
+
+The example query files in this repository correspond to the following tasks:
+
+- `t1.cql`: Cartesian product of tables A and B
+- `t2.cql`: Permutation, drop, and matching
+- `t3.cql`: Existence check
+- `t4.cql`: Copying and constants 
+- `t5.cql`: Left merge on first column
