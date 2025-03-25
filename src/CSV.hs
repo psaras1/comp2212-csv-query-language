@@ -25,8 +25,7 @@ type CSV = [Row]
 
 -- | Parse a string into a CSV (list of rows)
 parseCSV :: String -> CSV
-parseCSV str = map parseLine (filter (not . null) (lines str))
-  where
+parseCSV str = map parseLine (lines str)  where
     parseLine :: String -> Row
     parseLine line = map trim (splitOnComma line)
     
