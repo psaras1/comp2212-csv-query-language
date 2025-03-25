@@ -32,7 +32,7 @@ cabal build
 
 ```bash
 # Run a query file
-cql t1.cql
+stack exec comp2212-csv-query-language-exe <cql_file_path>
 
 # The program will look for CSV files in the current directory
 # based on table names referenced in the query.
