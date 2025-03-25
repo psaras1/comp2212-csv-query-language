@@ -220,38 +220,39 @@ evalLeftMerge table1 colIdx table2 tables = do
         then Right []
         else do
             let joinColIndex = resolveColIndex csv1 [] colIdx
-                -- Group rows from table2 by the join column value
-                table2ByJoinCol = groupByColumn joinColIndex csv2
-                
-                mergeRows row1 = 
-                    -- Look for matching rows in table2
-                    case Map.lookup (row1 !! joinColIndex) table2ByJoinCol of
-                        Just matchingRows -> 
-                            -- For each matching row, merge with row1
-                            [mergeRow row1 matchingRow | matchingRow <- matchingRows]
-                        Nothing -> [] -- No matching rows
-                
-                -- Merge a row from table1 with a matching row from table2
-                mergeRow row1 row2 = 
-                    let mergeCol idx = 
+            
+            -- Group rows from table2 by the join column value
+            let table2ByJoinCol = groupByColumn joinColIndex csv2
+            
+            -- Merge a row from table1 with a matching row from table2
+            let mergeRow row1 row2 =
+                    let mergeCol idx =
                             if idx < length row1 && row1 !! idx == ""
                                 then if idx < length row2 then row2 !! idx else ""
                                 else row1 !! idx
                     in [mergeCol i | i <- [0..max (length row1 - 1) (length row2 - 1)]]
-                
-                -- Apply the merge operation
-                result = concatMap mergeRows csv1
-                
+            
+            let mergeRows row1 =
+                    -- Look for matching rows in table2
+                    case Map.lookup (row1 !! joinColIndex) table2ByJoinCol of
+                        Just matchingRows ->
+                            -- For each matching row, merge with row1
+                            [mergeRow row1 matchingRow | matchingRow <- matchingRows]
+                        Nothing -> [row1] -- Keep original row if no match
+            
+            -- Apply the merge operation
+            let result = concatMap mergeRows csv1
+            
             Right result
 
--- | Group rows by the value in a specific column
+-- Helper function to group rows by a specific column
 groupByColumn :: Int -> CSV -> Map.Map String [Row]
 groupByColumn colIndex csv = 
     foldl (\acc row -> 
         let key = if colIndex < length row then row !! colIndex else ""
         in Map.insertWith (++) key [row] acc
     ) Map.empty csv
-
+    
 -- | Evaluate a PROJECT operation
 evalProject :: [ColIndex] -> TableExpr -> Map.Map String CSV -> Either String CSV
 evalProject colIndices table tables = do
