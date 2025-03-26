@@ -178,9 +178,9 @@ Condition : Condition AND Condition          { And $1 $3 }
           | MATCH ColIndex ColIndex          { Match $2 $3 }
           | EMPTY ColIndex                   { IsEmpty $2 }
 
--- Modified Expressions to remove the ColReference intermediary
--- and explicitly tag column references
+-- Modified Expressions rule to handle column references directly
 Expr : COLREF ColIndex                      { ColRef $2 }
+     | ColIndex                             { ColRef $1 }  
      | Literal                               { $1 }
      | Expr '+' Expr                         { BinaryOp Add $1 $3 }
      | Expr '-' Expr                         { BinaryOp Subtract $1 $3 }
