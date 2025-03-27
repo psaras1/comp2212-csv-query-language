@@ -238,7 +238,7 @@ evalLeftMerge table1 colIdx table2 tables = do
                         Just matchingRows ->
                             -- For each matching row, merge with row1
                             [mergeRow row1 matchingRow | matchingRow <- matchingRows]
-                        Nothing -> [row1] -- Keep original row if no match
+                        Nothing -> [] -- Nothing if no match 
             
             -- Apply the merge operation
             let result = concatMap mergeRows csv1
