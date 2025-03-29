@@ -132,9 +132,11 @@ LeftMerge : LEFT MERGE TableExpr ON ColIndex WITH TableExpr
 
 -- Project operation
 Project : PROJECT ColIndices FROM TableExpr
-                                             { Project $2 $4 }
+                                           { Project $2 $4 }
         | PROJECT ColIndices FROM TableExpr BY ColIndices
-                                             { ProjectGroupBy $2 $4 $6 }
+                                           { ProjectGroupBy $2 $4 $6 }
+        | PROJECT ColIndices FROM TableExpr WHERE Condition
+                                           { PermuteWhere $2 $4 $6 }
 
 -- RENAME operation
 RenameOperation : RENAME ColIndex TO identifier FROM TableExpr
@@ -247,6 +249,7 @@ data QueryExpr =
   | CopyWithConstant ColIndex String TableExpr
   | LeftMerge TableExpr ColIndex TableExpr
   | Project [ColIndex] TableExpr
+  | ProjectWhere [ColIndex] TableExpr Condition
   | ProjectGroupBy [ColIndex] TableExpr [ColIndex]  
   | RenameColumn ColIndex String TableExpr 
   | CreateTable String QueryExpr  

@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE CPP #-}
-{-# LINE 1 "Lexer.x" #-}
+{-# LINE 1 "src/Lexer.x" #-}
 module Lexer where
 #include "ghcconfig.h"
 import qualified Data.Array
@@ -27966,7 +27966,7 @@ alexRightContext IBOX(sc) user__ _ _ input__ =
         -- match when checking the right context, just
         -- the first match will do.
 #endif
-{-# LINE 81 "Lexer.x" #-}
+{-# LINE 81 "src/Lexer.x" #-}
 -- Strip quotes from string literals
 strip :: String -> String
 strip s = init (tail s)

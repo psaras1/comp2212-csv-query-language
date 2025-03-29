@@ -62,6 +62,7 @@ getTableNames query = case query of
     ProjectGroupBy _ table _ -> getTablesFromExpr table
     RenameColumn _ _ table -> getTablesFromExpr table
     CreateTable _ subQuery -> getTableNames subQuery
+    Union query1 query2 -> getTableNames query1 ++ getTableNames query2
 
 -- Helper to extract table names from table expressions
 getTablesFromExpr :: TableExpr -> [String]
@@ -115,6 +116,7 @@ evalQuery query tables = case query of
     RenameColumn colIdx newName table -> evalRenameColumn colIdx newName table tables
     CreateTable _ subQuery -> evalQuery subQuery tables
     Union query1 query2 -> evalUnion query1 query2 tables
+    ProjectWhere cols table cond -> evalProjectWhere cols table cond tables
 
 
 
@@ -269,16 +271,40 @@ groupByColumn colIndex csv =
     ) Map.empty csv
     
 -- | Evaluate a PROJECT operation
+-- Add this to Interpreter.hs
 evalProject :: [ColIndex] -> TableExpr -> Map.Map String CSV -> Either String CSV
 evalProject colIndices table tables = do
     tableData <- evalTableExpr table tables
-    -- Convert ColIndex to actual column indices
-    let columnIndices = map (resolveColIndex tableData []) colIndices
-    -- Guard against invalid column indices
-    if any (< 0) columnIndices || any (>= length (head tableData)) columnIndices
-        then Left "Column index out of bounds"
-        else let projectRow row = [row !! idx | idx <- columnIndices]
-             in Right $ map projectRow tableData
+    -- Handle empty tables
+    if null tableData
+        then Right []
+        else do
+            -- Check if there are any rows in the table
+            let firstRow = head tableData
+            let numCols = length firstRow
+            
+            -- Convert ColIndex to actual column indices
+            let columnIndices = map (resolveColIndex tableData []) colIndices
+            
+            -- For Debugging
+            let indexInfo = "Requested indices: " ++ show columnIndices ++ 
+                           ", Available columns: " ++ show numCols ++
+                           ", First row: " ++ show firstRow
+                           
+            -- Guard against invalid column indices
+            if any (< 0) columnIndices || any (>= numCols) columnIndices
+                then Left $ "Column index out of bounds. " ++ indexInfo
+                else let projectRow row = [row !! idx | idx <- columnIndices]
+                     in Right $ map projectRow tableData
+-- | Evaluate a PROJECT with WHERE condition
+evalProjectWhere :: [ColIndex] -> TableExpr -> Condition -> Map.Map String CSV -> Either String CSV
+evalProjectWhere colIndices table cond tables = do
+    tableData <- evalTableExpr table tables
+    -- Filter rows based on the condition
+    let filteredData = filter (rowMatchesCondition cond tableData) tableData
+    -- Then project the columns using a temporary table
+    evalProject colIndices (SubQuery (Select AllColumns (Table "temp") Nothing)) 
+                (Map.singleton "temp" filteredData)
 
 -- | Evaluate a PROJECT GROUP BY operation
 evalProjectGroupBy :: [ColIndex] -> TableExpr -> [ColIndex] -> Map.Map String CSV -> Either String CSV

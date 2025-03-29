@@ -1,3 +1,5 @@
-Eric
-
-Brenda
+name,age,status,city
+Alice,25,active,London
+Bob,30,,New York
+Charlie,22,active,Paris
+Diana,35,inactive,Berlin
