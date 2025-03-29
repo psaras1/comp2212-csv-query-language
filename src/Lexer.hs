@@ -27966,7 +27966,7 @@ alexRightContext IBOX(sc) user__ _ _ input__ =
         -- match when checking the right context, just
         -- the first match will do.
 #endif
-{-# LINE 80 "Lexer.x" #-}
+{-# LINE 81 "Lexer.x" #-}
 -- Strip quotes from string literals
 strip :: String -> String
 strip s = init (tail s)

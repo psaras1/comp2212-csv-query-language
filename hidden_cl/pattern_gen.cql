@@ -1,11 +1,6 @@
-SELECT #1 FROM A
-UNION
-SELECT "foo" FROM A 
-UNION
-SELECT #1 FROM A
-UNION
-SELECT "bar" FROM A
-UNION
-SELECT #1 FROM A
-UNION
-SELECT "baz" FROM A;
+-- Create a table with the pattern
+CREATE temp AS
+  SELECT #1, #1, #1 FROM A;
+
+-- Then use COPY with CONSTANT to interleave constants
+COPY #1 WITH CONSTANT "foo" FROM temp;

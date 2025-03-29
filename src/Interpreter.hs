@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module Interpreter (
     interpretQuery,
     runQueryFile,
@@ -7,12 +8,10 @@ module Interpreter (
 import CSV
 import Parser
 import Lexer
-import Data.List (sort, sortBy, find, intersperse, nub)
-import Data.Maybe (fromMaybe, isJust, isNothing, mapMaybe, catMaybes)
-import System.IO (readFile)
+import Data.List (nub)
+import Data.Maybe (fromMaybe)
 import System.Directory (doesFileExist)
-import Control.Exception (catch, IOException, try)
-import Data.Char (isSpace)
+import Control.Exception (IOException, try)
 import qualified Data.Map as Map
 
 -- | Main function to interpret a query and execute it on given CSV files
@@ -77,7 +76,7 @@ loadCSVFiles tableNames = do
     results <- mapM (\name -> loadCSVFile name >>= \res -> return (name, res)) tableNames
     if any (isLeft . snd) results
         then return $ Left $ fromMaybe "Error loading CSV files" $ findFirstError results
-        else return $ Right $ Map.fromList $ map (\(name, Right csv) -> (name, csv)) results
+        else return $ Right $ Map.fromList [(name, csv) | (name, Right csv) <- results]
   where
     isLeft (Left _) = True
     isLeft _ = False
@@ -116,6 +115,8 @@ evalQuery query tables = case query of
     RenameColumn colIdx newName table -> evalRenameColumn colIdx newName table tables
     CreateTable _ subQuery -> evalQuery subQuery tables
     Union query1 query2 -> evalUnion query1 query2 tables
+
+
 
 -- | Evaluate a UNION operation
 evalUnion :: QueryExpr -> QueryExpr -> Map.Map String CSV -> Either String CSV
@@ -309,7 +310,7 @@ groupByColumns colIndices csv =
 
 -- | Evaluate a RENAME COLUMN operation
 evalRenameColumn :: ColIndex -> String -> TableExpr -> Map.Map String CSV -> Either String CSV
-evalRenameColumn colIdx newName table tables = do
+evalRenameColumn _ _ table tables = do
     -- We're just renaming for documentation, doesn't affect the data processing
     evalTableExpr table tables
 
@@ -344,10 +345,7 @@ evalJoin table1 table2 cond tables = do
 -- | Check if a row matches a join condition
 rowMatchesJoinCondition :: Condition -> CSV -> CSV -> Row -> Bool
 rowMatchesJoinCondition cond csv1 csv2 row =
-    let numCols1 = if null csv1 then 0 else length (head csv1)
-        leftRow = take numCols1 row
-        rightRow = drop numCols1 row
-        combinedData = csv1 ++ csv2
+    let combinedData = csv1 ++ csv2
     in evalCondition cond combinedData row
 
 -- | Check if a row matches a condition
@@ -415,13 +413,13 @@ resolveColIndex csv headers colIdx = case colIdx of
     ArrayAccess _ _ -> error "Array access not supported"  -- This would require more complex logic
 
 -- | Find the index of an element in a list
-findIndex :: Eq a => (a -> Bool) -> [a] -> Maybe Int
+findIndex :: (a -> Bool) -> [a] -> Maybe Int
 findIndex f xs = findIndexHelper 0 xs
   where
     findIndexHelper _ [] = Nothing
-    findIndexHelper i (x:xs) 
+    findIndexHelper i (x:xss) 
         | f x = Just i
-        | otherwise = findIndexHelper (i+1) xs
+        | otherwise = findIndexHelper (i+1) xss
 
 -- | Resolve column list to actual column indices
 resolveColumnList :: ColumnList -> CSV -> Either String [Int]
@@ -438,7 +436,7 @@ resolveColumnList cols csv = case cols of
 
 -- | Project columns from source data to result data
 projectColumns :: [Int] -> CSV -> CSV -> CSV
-projectColumns columns sourceData resultData =
+projectColumns columns _ resultData =
     let projectRow row = map getColValue columns
           where 
             getColValue idx 
@@ -466,7 +464,7 @@ runQueryFile filePath = do
 
 -- | Run a query on specific CSV files
 runQueryOnFiles :: String -> [FilePath] -> IO (Either String CSV)
-runQueryOnFiles queryStr files = do
+runQueryOnFiles queryStr _ = do
     let tokens = lexer queryStr
     case tokens of
         [] -> return $ Left "Empty query"

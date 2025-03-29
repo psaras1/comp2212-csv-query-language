@@ -67,6 +67,7 @@ import Data.Maybe (fromMaybe)
   int         { PT _ (TokenInt $$) }
 
 -- Define precedence and associativity
+%left UNION
 %left OR
 %left AND
 %nonassoc '=' '!=' '<' '>' '<=' '>='
@@ -77,17 +78,24 @@ import Data.Maybe (fromMaybe)
 
 -- Main query structure
 Query : QueryExpr ';'                      { $1 }
+      | QueryExpr                          { $1 }
+      
+-- Split out union operations for clarity
+QueryExpr : SimpleQuery                    { $1 }
+          | QueryExpr UNION SimpleQuery    { Union $1 $3 }
 
-QueryExpr : SelectQuery                    { $1 }
-          | CartesianProduct               { $1 }
-          | PermuteDrop                    { $1 }
-          | ExistsCheck                    { $1 }
-          | CopyAndConstants               { $1 }
-          | LeftMerge                      { $1 }
-          | Project                        { $1 }
-          | RenameOperation                { $1 }  
-          | CreateOperation                { $1 } 
-          | QueryExpr UNION QueryExpr      { Union $1 $3 } 
+SimpleQuery : SelectQuery                  { $1 }
+            | CartesianProduct             { $1 }
+            | PermuteDrop                  { $1 }
+            | ExistsCheck                  { $1 }
+            | CopyAndConstants             { $1 }
+            | LeftMerge                    { $1 }
+            | Project                      { $1 }
+            | RenameOperation              { $1 }  
+            | CreateOperation              { $1 }
+            | ParenQuery                   { $1 }
+
+ParenQuery : '(' QueryExpr ')'             { $2 }
 
 -- SELECT query format
 SelectQuery : SELECT ColumnList FROM TableExpr OptionalWhere
@@ -126,20 +134,20 @@ LeftMerge : LEFT MERGE TableExpr ON ColIndex WITH TableExpr
 Project : PROJECT ColIndices FROM TableExpr
                                              { Project $2 $4 }
         | PROJECT ColIndices FROM TableExpr BY ColIndices
-                                             { ProjectGroupBy $2 $4 $6 }  -- New
+                                             { ProjectGroupBy $2 $4 $6 }
 
--- RENAME operation (new)
+-- RENAME operation
 RenameOperation : RENAME ColIndex TO identifier FROM TableExpr
                                              { RenameColumn $2 $4 $6 }
 
--- CREATE operation (new)
-CreateOperation : CREATE identifier AS QueryExpr
+-- CREATE operation
+CreateOperation : CREATE identifier AS SimpleQuery
                                              { CreateTable $2 $4 }
 
 -- Column list for SELECT statements
 ColumnList : '*'                             { AllColumns }
            | ColumnExprList                  { SpecificColumns $1 }
-           | ColumnExprList ',' string   { SpecificColumns ($1 ++ [StringColumn $3]) }
+           | ColumnExprList ',' string       { SpecificColumns ($1 ++ [StringColumn $3]) }
 
 ColumnExprList : ColumnExpr                  { [$1] }
                | ColumnExprList ',' ColumnExpr
@@ -154,7 +162,9 @@ TableExpr : TableTerm                        { $1 }
                                              { Join $1 $3 $5 }
 
 TableTerm : identifier                       { Table $1 }
-          | '(' QueryExpr ')'                { SubQuery $2 }
+          | SubQueryExpr                     { $1 }
+
+SubQueryExpr : '(' QueryExpr ')'             { SubQuery $2 }
 
 TableList : TableExpr                        { [$1] }
           | TableList ',' TableExpr          { $1 ++ [$3] }
@@ -162,41 +172,47 @@ TableList : TableExpr                        { [$1] }
 -- Renamed WhereClause to OptionalWhere for clarity
 OptionalWhere : WHERE Condition             { Just $2 }
               |                             { Nothing }
-              | WHERE ROW int               { Just (RowFilter $3) }  -- New
+              | WHERE ROW int               { Just (RowFilter $3) }
 
 -- Conditions for WHERE clause
 Condition : Condition AND Condition          { And $1 $3 }
           | Condition OR Condition           { Or $1 $3 }
-          | '(' Condition ')'                { $2 }
-          | Expr '=' Expr                    { Equals $1 $3 }
-          | Expr '!=' Expr                   { NotEquals $1 $3 }
-          | Expr '<' Expr                    { LessThan $1 $3 }
-          | Expr '>' Expr                    { GreaterThan $1 $3 }
-          | Expr '<=' Expr                   { LessEquals $1 $3 }
-          | Expr '>=' Expr                   { GreaterEquals $1 $3 }
-          | Expr IS NULL                     { IsNull $1 }
-          | Expr IS NOT NULL                 { IsNotNull $1 }
-          | Expr IN '(' ExprList ')'         { InList $1 $4 }
-          | MATCH ColIndex ColIndex          { Match $2 $3 }
-          | EMPTY ColIndex                   { IsEmpty $2 }
-          | NOT EMPTY ColIndex               { NotEmpty $3 }
-          | EXISTS COL ColIndex             { ExistsCol $3 }
+          | ParenCondition                   { $1 }
+          | SimpleCondition                  { $1 }
+
+ParenCondition : '(' Condition ')'           { $2 }
+
+SimpleCondition : Expr '=' Expr              { Equals $1 $3 }
+                | Expr '!=' Expr             { NotEquals $1 $3 }
+                | Expr '<' Expr              { LessThan $1 $3 }
+                | Expr '>' Expr              { GreaterThan $1 $3 }
+                | Expr '<=' Expr             { LessEquals $1 $3 }
+                | Expr '>=' Expr             { GreaterEquals $1 $3 }
+                | Expr IS NULL               { IsNull $1 }
+                | Expr IS NOT NULL           { IsNotNull $1 }
+                | Expr IN '(' ExprList ')'   { InList $1 $4 }
+                | MATCH ColIndex ColIndex    { Match $2 $3 }
+                | EMPTY ColIndex             { IsEmpty $2 }
+                | NOT EMPTY ColIndex         { NotEmpty $3 }
+                | EXISTS COL ColIndex        { ExistsCol $3 }
 
 -- Modified Expressions rule to handle column references directly
 Expr : COLREF ColIndex                      { ColRef $2 }
      | ColIndex                             { ColRef $1 }  
-     | Literal                               { $1 }
-     | Expr '+' Expr                         { BinaryOp Add $1 $3 }
-     | Expr '-' Expr                         { BinaryOp Subtract $1 $3 }
-     | Expr '*' Expr                         { BinaryOp Multiply $1 $3 }
-     | Expr '/' Expr                         { BinaryOp Divide $1 $3 }
-     | '(' Expr ')'                          { $2 }
+     | Literal                              { $1 }
+     | Expr '+' Expr                        { BinaryOp Add $1 $3 }
+     | Expr '-' Expr                        { BinaryOp Subtract $1 $3 }
+     | Expr '*' Expr                        { BinaryOp Multiply $1 $3 }
+     | Expr '/' Expr                        { BinaryOp Divide $1 $3 }
+     | ParenExpr                            { $1 }
+
+ParenExpr : '(' Expr ')'                     { $2 }
 
 -- Column indices with more explicit syntax
 ColIndex : '#' int                           { IndexBased $2 }
          | identifier                        { NameBased $1 }
-         | identifier '.' identifier         { NestedField $1 $3 }  -- New
-         | identifier '[' int ']'            { ArrayAccess $1 $3 }  -- New
+         | identifier '.' identifier         { NestedField $1 $3 }
+         | identifier '[' int ']'            { ArrayAccess $1 $3 }
 
 ColIndices : ColIndex                        { [$1] }
            | ColIndices ',' ColIndex         { $1 ++ [$3] }
@@ -295,7 +311,7 @@ data BinOp =
 data ColIndex = 
     IndexBased Int
   | NameBased String
-  | NestedField String String  -- New
-  | ArrayAccess String Int     -- New
+  | NestedField String String
+  | ArrayAccess String Int
   deriving (Show)
 }

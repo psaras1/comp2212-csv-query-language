@@ -1,10 +1,9 @@
-module Main where
+module Main (main) where
 
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
-import Data.List (intercalate)
-import Control.Monad (forM_)
+
 
 import CSV
 import Interpreter
@@ -32,12 +31,3 @@ runQueryAndPrintResult queryFile = do
             putStrLn $ writeCSV csv
             exitSuccess
 
--- | Helper function to display CSV data for debugging
-displayCSV :: CSV -> IO ()
-displayCSV csv = do
-    putStrLn $ "CSV with " ++ show (length csv) ++ " rows:"
-    forM_ csv $ \row -> do
-        putStrLn $ "[" ++ intercalate ", " (map showCell row) ++ "]"
-  where
-    showCell "" = "<empty>"
-    showCell cell = "\"" ++ cell ++ "\""
