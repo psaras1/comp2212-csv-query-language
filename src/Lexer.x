@@ -40,6 +40,8 @@ tokens :-
   CREATE                        { \p s -> PT p TokenCreate }
   PROJECT                       { \p s -> PT p TokenProject }
   COLREF                        { \p s -> PT p TokenColRef }
+  UNION                         { \p s -> PT p TokenUnion }
+
   
   -- CSV-specific functions and operations
   BY                            { \p s -> PT p TokenBy }
@@ -110,6 +112,7 @@ data Token =
   TokenCreate |
   TokenProject |
   TokenColRef |
+  TokenUnion |
   
   -- CSV-specific functions and operations
   TokenBy |

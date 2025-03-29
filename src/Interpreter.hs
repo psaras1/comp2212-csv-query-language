@@ -115,6 +115,20 @@ evalQuery query tables = case query of
     ProjectGroupBy cols table groupCols -> evalProjectGroupBy cols table groupCols tables
     RenameColumn colIdx newName table -> evalRenameColumn colIdx newName table tables
     CreateTable _ subQuery -> evalQuery subQuery tables
+    Union query1 query2 -> evalUnion query1 query2 tables
+
+-- | Evaluate a UNION operation
+evalUnion :: QueryExpr -> QueryExpr -> Map.Map String CSV -> Either String CSV
+evalUnion query1 query2 tables = do
+    result1 <- evalQuery query1 tables
+    result2 <- evalQuery query2 tables
+    
+    -- Check if the number of columns match
+    if null result1 || null result2
+        then Right $ result1 ++ result2  -- If either is empty, just concatenate
+        else if length (head result1) /= length (head result2)
+            then Left "UNION operations require the same number of columns"
+            else Right $ nub (result1 ++ result2)  -- Remove duplicates
 
 -- | Evaluate a SELECT query
 evalSelect :: ColumnList -> TableExpr -> Maybe Condition -> Map.Map String CSV -> Either String CSV
@@ -364,6 +378,13 @@ evalCondition cond csv row = case cond of
         let idx = resolveColIndex csv [] colIdx
         in if idx >= length row then True else row !! idx == ""
     RowFilter rowNum -> rowNum >= 0 && rowNum < length csv && row == csv !! rowNum
+    NotEmpty colIdx ->
+        let idx = resolveColIndex csv [] colIdx
+        in if idx >= length row then False else row !! idx /= ""
+    ExistsCol colIdx ->
+        let idx = resolveColIndex csv [] colIdx
+        in if idx >= length row then False else row !! idx /= ""
+    
 
 -- | Evaluate an expression against a row
 evalExpr :: Expr -> CSV -> Row -> String
@@ -412,12 +433,18 @@ resolveColumnList cols csv = case cols of
     SpecificColumns colExprs -> 
         let resolveColExpr (SimpleColumn colIdx) = Right [resolveColIndex csv [] colIdx]
             resolveColExpr (ColumnAlias colIdx _) = Right [resolveColIndex csv [] colIdx]
+            resolveColExpr (StringColumn _) = Right [-1]
         in concatMapM resolveColExpr colExprs
 
 -- | Project columns from source data to result data
 projectColumns :: [Int] -> CSV -> CSV -> CSV
 projectColumns columns sourceData resultData =
-    let projectRow row = [row !! idx | idx <- columns, idx < length row]
+    let projectRow row = map getColValue columns
+          where 
+            getColValue idx 
+              | idx >= 0 && idx < length row = row !! idx
+              | idx == -1 = ""  -- This is a placeholder - you'll need more logic here
+              | otherwise = ""
     in map projectRow resultData
 
 -- | Helper for concatMap with Either monad

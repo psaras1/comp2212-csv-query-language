@@ -43,6 +43,7 @@ import Data.Maybe (fromMaybe)
   EMPTY       { PT _ TokenEmpty }
   MATCH       { PT _ TokenMatch }
   COLREF      { PT _ TokenColRef }
+  UNION       { PT _ TokenUnion }
   '='         { PT _ TokenEq }
   ','         { PT _ TokenComma }
   ';'         { PT _ TokenSemicolon }
@@ -76,7 +77,6 @@ import Data.Maybe (fromMaybe)
 
 -- Main query structure
 Query : QueryExpr ';'                      { $1 }
-      | QueryExpr                          { $1 }
 
 QueryExpr : SelectQuery                    { $1 }
           | CartesianProduct               { $1 }
@@ -85,14 +85,15 @@ QueryExpr : SelectQuery                    { $1 }
           | CopyAndConstants               { $1 }
           | LeftMerge                      { $1 }
           | Project                        { $1 }
-          | RenameOperation                { $1 }  -- New
-          | CreateOperation                { $1 }  -- New
+          | RenameOperation                { $1 }  
+          | CreateOperation                { $1 } 
+          | QueryExpr UNION QueryExpr      { Union $1 $3 } 
 
 -- SELECT query format
 SelectQuery : SELECT ColumnList FROM TableExpr OptionalWhere
                                              { Select $2 $4 $5 }
             | SELECT DISTINCT ColumnList FROM TableExpr OptionalWhere
-                                             { SelectDistinct $3 $5 $6 }  -- New
+                                             { SelectDistinct $3 $5 $6 }  
 
 -- Cartesian product operation
 CartesianProduct : CARTESIAN PRODUCT TableList
@@ -138,6 +139,7 @@ CreateOperation : CREATE identifier AS QueryExpr
 -- Column list for SELECT statements
 ColumnList : '*'                             { AllColumns }
            | ColumnExprList                  { SpecificColumns $1 }
+           | ColumnExprList ',' string   { SpecificColumns ($1 ++ [StringColumn $3]) }
 
 ColumnExprList : ColumnExpr                  { [$1] }
                | ColumnExprList ',' ColumnExpr
@@ -177,6 +179,8 @@ Condition : Condition AND Condition          { And $1 $3 }
           | Expr IN '(' ExprList ')'         { InList $1 $4 }
           | MATCH ColIndex ColIndex          { Match $2 $3 }
           | EMPTY ColIndex                   { IsEmpty $2 }
+          | NOT EMPTY ColIndex               { NotEmpty $3 }
+          | EXISTS COL ColIndex             { ExistsCol $3 }
 
 -- Modified Expressions rule to handle column references directly
 Expr : COLREF ColIndex                      { ColRef $2 }
@@ -218,7 +222,7 @@ parseError (PT pos t:_) = error $ "Parse error at line " ++ show line ++ ", colu
 -- Main query operations
 data QueryExpr = 
     Select ColumnList TableExpr (Maybe Condition)
-  | SelectDistinct ColumnList TableExpr (Maybe Condition)  -- New
+  | SelectDistinct ColumnList TableExpr (Maybe Condition)  
   | CartesianProduct [TableExpr]
   | Permute [ColIndex] TableExpr
   | Drop [ColIndex] TableExpr
@@ -227,9 +231,10 @@ data QueryExpr =
   | CopyWithConstant ColIndex String TableExpr
   | LeftMerge TableExpr ColIndex TableExpr
   | Project [ColIndex] TableExpr
-  | ProjectGroupBy [ColIndex] TableExpr [ColIndex]  -- New
-  | RenameColumn ColIndex String TableExpr  -- New
-  | CreateTable String QueryExpr  -- New
+  | ProjectGroupBy [ColIndex] TableExpr [ColIndex]  
+  | RenameColumn ColIndex String TableExpr 
+  | CreateTable String QueryExpr  
+  | Union QueryExpr QueryExpr 
   deriving (Show)
 
 -- Column selection
@@ -241,6 +246,7 @@ data ColumnList =
 data ColumnExpr = 
     SimpleColumn ColIndex
   | ColumnAlias ColIndex String
+  | StringColumn String 
   deriving (Show)
 
 -- Table expressions
@@ -265,7 +271,9 @@ data Condition =
   | InList Expr [Expr]
   | Match ColIndex ColIndex
   | IsEmpty ColIndex
-  | RowFilter Int  -- New
+  | NotEmpty ColIndex
+  | RowFilter Int
+  | ExistsCol ColIndex
   deriving (Show)
 
 -- Expressions
