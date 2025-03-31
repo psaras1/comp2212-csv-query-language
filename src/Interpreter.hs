@@ -39,7 +39,7 @@ runQueries (query:rest) tables = do
     result <- processQueryWithState query tables
     case result of
         Left err -> return $ Left err
-        Right (_, newTables) -> 
+        Right (_, newTables) ->
             -- Process the remaining queries with updated tables
             runQueries rest newTables
 
@@ -53,23 +53,23 @@ processQueryWithState query tables = do
     -- Load only the CSV files that don't exist as temporary tables
     fileTables <- loadCSVFiles filesToLoad
     case fileTables of
-        Left err -> 
+        Left err ->
             -- Special case: if the error is about a table not found, check if it might be a typo
             if "File not found" `isPrefixOf` err then
                 -- If there are temporary tables with similar names, suggest them
                 let missingTable = head (words (drop 16 err))
-                    similarTables = filter (\name -> length name > 0 && 
-                                          head name == head missingTable) 
+                    similarTables = filter (\name -> length name > 0 &&
+                                          head name == head missingTable)
                                           (Map.keys tables)
-                    suggestion = if null similarTables 
-                                 then "" 
-                                 else ". Did you mean one of these: " ++ 
+                    suggestion = if null similarTables
+                                 then ""
+                                 else ". Did you mean one of these: " ++
                                       intercalate ", " similarTables ++ "?"
                 in return $ Left (err ++ suggestion)
             else return $ Left err
         Right fileMap -> do
             -- Combine file data with any temporary tables
-            -- IMPORTANT: temporary tables take precedence over files
+            -- temporary tables take precedence over files
             let allTables = Map.union tables fileMap
             -- Evaluate the query
             case evalQueryWithState query allTables of
@@ -88,27 +88,6 @@ evalQueryWithState query tables = case query of
     _ -> do
         result <- evalQuery query tables
         Right (result, tables)
-
--- | Run a query that's been parsed into an AST
-runQuery :: QueryExpr -> IO (Either String CSV)
-runQuery query = do
-    result <- processQuery query
-    case result of
-        Left err -> return $ Left err
-        Right csv -> return $ Right (sortCSV csv) -- Always sort the final result
-
--- | Process a query, loading necessary files and executing the query
-processQuery :: QueryExpr -> IO (Either String CSV)
-processQuery query = do
-    -- Extract table names from the query
-    let tableNames = getTableNames query
-    -- Load all needed CSV files
-    tables <- loadCSVFiles tableNames
-    case tables of
-        Left err -> return $ Left err
-        Right tableMap -> do
-            -- Evaluate the query with the loaded tables
-            return $ evalQuery query tableMap
 
 -- | Extract table names from a query
 getTableNames :: QueryExpr -> [String]
@@ -145,8 +124,8 @@ loadCSVFiles tableNames = do
   where
     isLeft (Left _) = True
     isLeft _ = False
-    
-    findFirstError results = 
+
+    findFirstError results =
         let errors = [(name, err) | (name, Left err) <- results]
         in if null errors then Nothing else Just $ "Error loading " ++ fst (head errors) ++ ": " ++ snd (head errors)
 
@@ -182,7 +161,7 @@ evalQuery query tables = case query of
         result <- evalQuery subQuery tables
         Right result  -- Return the result of the subquery
     Union query1 query2 -> evalUnion query1 query2 tables
-    
+
 
 
 
@@ -191,7 +170,7 @@ evalUnion :: QueryExpr -> QueryExpr -> Map.Map String CSV -> Either String CSV
 evalUnion query1 query2 tables = do
     result1 <- evalQuery query1 tables
     result2 <- evalQuery query2 tables
-    
+
     -- Check if the number of columns match
     if null result1 || null result2
         then Right $ result1 ++ result2  -- If either is empty, just concatenate
@@ -222,7 +201,7 @@ evalCartesianProduct [table] tables = evalTableExpr table tables
 evalCartesianProduct (table1:table2:rest) tables = do
     csv1 <- evalTableExpr table1 tables
     -- If there are more tables, first compute the product of table2 and the rest
-    csv2 <- if null rest 
+    csv2 <- if null rest
                then evalTableExpr table2 tables
                else evalCartesianProduct (table2:rest) tables
     -- Handle empty CSV cases
@@ -232,7 +211,7 @@ evalCartesianProduct (table1:table2:rest) tables = do
   where
     -- Perform cartesian product of two CSV datasets
     cartesianProduct :: CSV -> CSV -> CSV
-    cartesianProduct csv1 csv2 = 
+    cartesianProduct csv1 csv2 =
         [row1 ++ row2 | row1 <- csv1, row2 <- csv2]
 
 -- | Evaluate a PERMUTE operation
@@ -256,7 +235,7 @@ evalDrop colIndices table tables = do
     -- Guard against invalid column indices
     if any (< 0) columnIndices || any (>= length (head tableData)) columnIndices
         then Left "Column index out of bounds"
-        else let dropColumns row = 
+        else let dropColumns row =
                    [val | (val, idx) <- zip row [0..], idx `notElem` columnIndices]
              in Right $ map dropColumns tableData
 
@@ -267,7 +246,7 @@ evalPermuteWhere colIndices table cond tables = do
     -- Filter rows based on the condition
     let filteredData = filter (rowMatchesCondition cond tableData) tableData
     -- Then permute the columns
-    evalPermute colIndices (SubQuery (Select AllColumns (Table "temp") Nothing)) 
+    evalPermute colIndices (SubQuery (Select AllColumns (Table "temp") Nothing))
                 (Map.singleton "temp" filteredData)
 
 -- | Evaluate an EXISTS check
@@ -297,16 +276,16 @@ evalLeftMerge :: TableExpr -> ColIndex -> TableExpr -> Map.Map String CSV -> Eit
 evalLeftMerge table1 colIdx table2 tables = do
     csv1 <- evalTableExpr table1 tables
     csv2 <- evalTableExpr table2 tables
-    
+
     -- Ensure both tables have data
     if null csv1 || null csv2
         then Right []
         else do
             let joinColIndex = resolveColIndex csv1 [] colIdx
-            
+
             -- Group rows from table2 by the join column value
             let table2ByJoinCol = groupByColumn joinColIndex csv2
-            
+
             -- Merge a row from table1 with a matching row from table2
             let mergeRow row1 row2 =
                     let mergeCol idx =
@@ -314,7 +293,7 @@ evalLeftMerge table1 colIdx table2 tables = do
                                 then if idx < length row2 then row2 !! idx else ""
                                 else row1 !! idx
                     in [mergeCol i | i <- [0..max (length row1 - 1) (length row2 - 1)]]
-            
+
             let mergeRows row1 =
                     -- Look for matching rows in table2
                     case Map.lookup (row1 !! joinColIndex) table2ByJoinCol of
@@ -322,20 +301,19 @@ evalLeftMerge table1 colIdx table2 tables = do
                             -- For each matching row, merge with row1
                             [mergeRow row1 matchingRow | matchingRow <- matchingRows]
                         Nothing -> [] -- Nothing if no match 
-            
+
             -- Apply the merge operation
             let result = concatMap mergeRows csv1
-            
+
             Right result
 
 -- Helper function to group rows by a specific column
 groupByColumn :: Int -> CSV -> Map.Map String [Row]
-groupByColumn colIndex csv = 
-    foldl (\acc row -> 
+groupByColumn colIndex = foldl (\acc row ->
         let key = if colIndex < length row then row !! colIndex else ""
         in Map.insertWith (++) key [row] acc
-    ) Map.empty csv
-    
+    ) Map.empty
+
 -- | Evaluate a PROJECT operation
 -- Add this to Interpreter.hs
 evalProject :: [ColIndex] -> TableExpr -> Map.Map String CSV -> Either String CSV
@@ -348,15 +326,15 @@ evalProject colIndices table tables = do
             -- Check if there are any rows in the table
             let firstRow = head tableData
             let numCols = length firstRow
-            
+
             -- Convert ColIndex to actual column indices
             let columnIndices = map (resolveColIndex tableData []) colIndices
-            
+
             -- For Debugging
-            let indexInfo = "Requested indices: " ++ show columnIndices ++ 
+            let indexInfo = "Requested indices: " ++ show columnIndices ++
                            ", Available columns: " ++ show numCols ++
                            ", First row: " ++ show firstRow
-                           
+
             -- Guard against invalid column indices
             if any (< 0) columnIndices || any (>= numCols) columnIndices
                 then Left $ "Column index out of bounds. " ++ indexInfo
@@ -370,22 +348,22 @@ evalProjectGroupBy projCols table groupCols tables = do
     -- Convert ColIndex to actual column indices
     let projIndices = map (resolveColIndex tableData []) projCols
         groupIndices = map (resolveColIndex tableData []) groupCols
-        
+
     -- Group rows by the values in the groupBy columns
     let groupedData = groupByColumns groupIndices tableData
-        
+
     -- For each group, project the specified columns
-    let result = map (\group -> 
+    let result = map (\group ->
                     let rep = head group -- Take the first row as representative
                     in [rep !! idx | idx <- projIndices]
                 ) groupedData
-    
+
     Right result
 
 -- | Group rows by multiple column values
 groupByColumns :: [Int] -> CSV -> [CSV]
 groupByColumns colIndices csv =
-    let groups = Map.fromListWith (++) 
+    let groups = Map.fromListWith (++)
                 [(tuple row, [row]) | row <- csv]
      in Map.elems groups
   where
@@ -400,7 +378,7 @@ evalRenameColumn _ _ table tables = do
 -- | Evaluate a table expression
 evalTableExpr :: TableExpr -> Map.Map String CSV -> Either String CSV
 evalTableExpr table tables = case table of
-    Table name -> 
+    Table name ->
         case Map.lookup name tables of
             Just csv -> Right csv
             Nothing -> Left $ "Table not found: " ++ name
@@ -412,17 +390,17 @@ evalJoin :: TableExpr -> TableExpr -> Condition -> Map.Map String CSV -> Either 
 evalJoin table1 table2 cond tables = do
     csv1 <- evalTableExpr table1 tables
     csv2 <- evalTableExpr table2 tables
-    
+
     if null csv1 || null csv2
         then Right []
         else do
             let combined = cartesianProduct csv1 csv2
                 -- Filter the combined rows based on the join condition
                 result = filter (rowMatchesJoinCondition cond csv1 csv2) combined
-            
+
             Right result
   where
-    cartesianProduct csv1 csv2 = 
+    cartesianProduct csv1 csv2 =
         [row1 ++ row2 | row1 <- csv1, row2 <- csv2]
 
 -- | Check if a row matches a join condition
@@ -433,7 +411,7 @@ rowMatchesJoinCondition cond csv1 csv2 row =
 
 -- | Check if a row matches a condition
 rowMatchesCondition :: Condition -> CSV -> Row -> Bool
-rowMatchesCondition cond csv row = evalCondition cond csv row
+rowMatchesCondition = evalCondition
 
 -- | Evaluate a condition against a row
 evalCondition :: Condition -> CSV -> Row -> Bool
@@ -449,33 +427,31 @@ evalCondition cond csv row = case cond of
     IsNull expr -> evalExpr expr csv row == ""
     IsNotNull expr -> evalExpr expr csv row /= ""
     InList expr list -> evalExpr expr csv row `elem` map (\e -> evalExpr e csv row) list
-    Match colIdx1 colIdx2 -> 
+    Match colIdx1 colIdx2 ->
         let idx1 = resolveColIndex csv [] colIdx1
             idx2 = resolveColIndex csv [] colIdx2
-        in if idx1 >= length row || idx2 >= length row
-           then False
-           else row !! idx1 == row !! idx2
-    IsEmpty colIdx -> 
+        in (not (idx1 >= length row || idx2 >= length row) && (row !! idx1 == row !! idx2))
+    IsEmpty colIdx ->
         let idx = resolveColIndex csv [] colIdx
-        in if idx >= length row then True else row !! idx == ""
+        in ((idx >= length row) || (row !! idx == ""))
     RowFilter rowNum -> rowNum >= 0 && rowNum < length csv && row == csv !! rowNum
     NotEmpty colIdx ->
         let idx = resolveColIndex csv [] colIdx
-        in if idx >= length row then False else row !! idx /= ""
+        in ((idx < length row) && (row !! idx /= ""))
     ExistsCol colIdx ->
         let idx = resolveColIndex csv [] colIdx
-        in if idx >= length row then False else row !! idx /= ""
-    
+        in ((idx < length row) && (row !! idx /= ""))
+
 
 -- | Evaluate an expression against a row
 evalExpr :: Expr -> CSV -> Row -> String
 evalExpr expr csv row = case expr of
-    ColRef colIdx -> 
+    ColRef colIdx ->
         let idx = resolveColIndex csv [] colIdx
         in if idx >= 0 && idx < length row then row !! idx else ""
     StringLit str -> str
     IntLit n -> show n
-    BinaryOp op expr1 expr2 -> 
+    BinaryOp op expr1 expr2 ->
         let val1 = evalExpr expr1 csv row
             val2 = evalExpr expr2 csv row
         in case op of
@@ -488,7 +464,7 @@ evalExpr expr csv row = case expr of
 resolveColIndex :: CSV -> [String] -> ColIndex -> Int
 resolveColIndex csv headers colIdx = case colIdx of
     IndexBased n -> n - 1  -- Convert 1-based to 0-based indexing
-    NameBased name -> 
+    NameBased name ->
         if null headers
             then if null csv then -1 else 0  -- Default to first column if no headers
             else fromMaybe (-1) $ findIndex (== name) headers
@@ -497,21 +473,21 @@ resolveColIndex csv headers colIdx = case colIdx of
 
 -- | Find the index of an element in a list
 findIndex :: (a -> Bool) -> [a] -> Maybe Int
-findIndex f xs = findIndexHelper 0 xs
+findIndex f = findIndexHelper 0
   where
     findIndexHelper _ [] = Nothing
-    findIndexHelper i (x:xss) 
+    findIndexHelper i (x:xss)
         | f x = Just i
         | otherwise = findIndexHelper (i+1) xss
 
 -- | Resolve column list to actual column indices
 resolveColumnList :: ColumnList -> CSV -> Either String [Int]
 resolveColumnList cols csv = case cols of
-    AllColumns -> 
+    AllColumns ->
         if null csv
             then Right []
             else Right [0..(length (head csv) - 1)]
-    SpecificColumns colExprs -> 
+    SpecificColumns colExprs ->
         let resolveColExpr (SimpleColumn colIdx) = Right [resolveColIndex csv [] colIdx]
             resolveColExpr (ColumnAlias colIdx _) = Right [resolveColIndex csv [] colIdx]
             resolveColExpr (StringColumn _) = Right [-1]
@@ -521,8 +497,8 @@ resolveColumnList cols csv = case cols of
 projectColumns :: [Int] -> CSV -> CSV -> CSV
 projectColumns columns _ resultData =
     let projectRow row = map getColValue columns
-          where 
-            getColValue idx 
+          where
+            getColValue idx
               | idx >= 0 && idx < length row = row !! idx
               | idx == -1 = ""  -- This is a placeholder - you'll need more logic here
               | otherwise = ""
@@ -530,10 +506,10 @@ projectColumns columns _ resultData =
 
 -- | Helper for concatMap with Either monad
 concatMapM :: (a -> Either String [b]) -> [a] -> Either String [b]
-concatMapM f xs = foldl (\acc x -> do
+concatMapM f = foldl (\acc x -> do
                           accResult <- acc
                           xResult <- f x
-                          return (accResult ++ xResult)) (Right []) xs
+                          return (accResult ++ xResult)) (Right [])
 
 -- | Load and run a query file
 runQueryFile :: FilePath -> IO (Either String CSV)

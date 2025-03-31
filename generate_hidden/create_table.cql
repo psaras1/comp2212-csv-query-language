@@ -1,5 +1,7 @@
--- Create a temporary table containing only employees from HR
-CREATE hr_employees AS SELECT #1, #2, #3 FROM A WHERE #4 = "HR";
+-- Do everything in a single query
+CREATE final_result AS 
+SELECT #1, #2, #4, #5 FROM A 
+WHERE #3 = "Electronics" AND #4 > 500 AND #5 > 100;
 
--- Now use the temporary table 
-SELECT * FROM hr_employees;
+-- Display the result
+SELECT * FROM final_result;
