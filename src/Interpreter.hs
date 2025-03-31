@@ -8,7 +8,7 @@ module Interpreter (
 import CSV
 import Parser
 import Lexer
-import Data.List (nub)
+import Data.List (nub, intercalate, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import System.Directory (doesFileExist)
 import Control.Exception (IOException, try)
@@ -22,8 +22,72 @@ interpretQuery queryStr = do
     case tokens of
         [] -> return $ Left "Empty query"
         _ -> do
-            let ast = parseQuery tokens
-            runQuery ast
+            let queries = parseQueries tokens
+            runQueries queries Map.empty
+
+-- | Run a list of queries sequentially
+runQueries :: [QueryExpr] -> Map.Map String CSV -> IO (Either String CSV)
+runQueries [] _ = return $ Left "No queries to execute"
+runQueries [query] tables = do
+    -- For the last query, return its result
+    result <- processQueryWithState query tables
+    case result of
+        Left err -> return $ Left err
+        Right (csv, _) -> return $ Right (sortCSV csv)  -- Extract just the CSV and sort it
+runQueries (query:rest) tables = do
+    -- Process the current query
+    result <- processQueryWithState query tables
+    case result of
+        Left err -> return $ Left err
+        Right (_, newTables) -> 
+            -- Process the remaining queries with updated tables
+            runQueries rest newTables
+
+-- | Process a single query with state
+processQueryWithState :: QueryExpr -> Map.Map String CSV -> IO (Either String (CSV, Map.Map String CSV))
+processQueryWithState query tables = do
+    -- Extract table names from the query
+    let tableNames = getTableNames query
+    -- Filter out table names that already exist in the temporary tables
+    let filesToLoad = filter (\name -> not (Map.member name tables)) tableNames
+    -- Load only the CSV files that don't exist as temporary tables
+    fileTables <- loadCSVFiles filesToLoad
+    case fileTables of
+        Left err -> 
+            -- Special case: if the error is about a table not found, check if it might be a typo
+            if "File not found" `isPrefixOf` err then
+                -- If there are temporary tables with similar names, suggest them
+                let missingTable = head (words (drop 16 err))
+                    similarTables = filter (\name -> length name > 0 && 
+                                          head name == head missingTable) 
+                                          (Map.keys tables)
+                    suggestion = if null similarTables 
+                                 then "" 
+                                 else ". Did you mean one of these: " ++ 
+                                      intercalate ", " similarTables ++ "?"
+                in return $ Left (err ++ suggestion)
+            else return $ Left err
+        Right fileMap -> do
+            -- Combine file data with any temporary tables
+            -- IMPORTANT: temporary tables take precedence over files
+            let allTables = Map.union tables fileMap
+            -- Evaluate the query
+            case evalQueryWithState query allTables of
+                Left err -> return $ Left (err ++ " in query: " ++ show query)
+                Right result -> return $ Right result
+
+-- | Evaluate a query on loaded CSV data and return the updated state
+evalQueryWithState :: QueryExpr -> Map.Map String CSV -> Either String (CSV, Map.Map String CSV)
+evalQueryWithState query tables = case query of
+    CreateTable name subQuery -> do
+        result <- evalQuery subQuery tables
+        -- Store the result in the tables map
+        let newTables = Map.insert name result tables
+        Right (result, newTables)
+    -- For other queries, just evaluate without changing tables
+    _ -> do
+        result <- evalQuery query tables
+        Right (result, tables)
 
 -- | Run a query that's been parsed into an AST
 runQuery :: QueryExpr -> IO (Either String CSV)
@@ -114,9 +178,11 @@ evalQuery query tables = case query of
     Project cols table -> evalProject cols table tables
     ProjectGroupBy cols table groupCols -> evalProjectGroupBy cols table groupCols tables
     RenameColumn colIdx newName table -> evalRenameColumn colIdx newName table tables
-    CreateTable _ subQuery -> evalQuery subQuery tables
+    CreateTable _ subQuery -> do
+        result <- evalQuery subQuery tables
+        Right result  -- Return the result of the subquery
     Union query1 query2 -> evalUnion query1 query2 tables
-    ProjectWhere cols table cond -> evalProjectWhere cols table cond tables
+    
 
 
 
@@ -296,15 +362,6 @@ evalProject colIndices table tables = do
                 then Left $ "Column index out of bounds. " ++ indexInfo
                 else let projectRow row = [row !! idx | idx <- columnIndices]
                      in Right $ map projectRow tableData
--- | Evaluate a PROJECT with WHERE condition
-evalProjectWhere :: [ColIndex] -> TableExpr -> Condition -> Map.Map String CSV -> Either String CSV
-evalProjectWhere colIndices table cond tables = do
-    tableData <- evalTableExpr table tables
-    -- Filter rows based on the condition
-    let filteredData = filter (rowMatchesCondition cond tableData) tableData
-    -- Then project the columns using a temporary table
-    evalProject colIndices (SubQuery (Select AllColumns (Table "temp") Nothing)) 
-                (Map.singleton "temp" filteredData)
 
 -- | Evaluate a PROJECT GROUP BY operation
 evalProjectGroupBy :: [ColIndex] -> TableExpr -> [ColIndex] -> Map.Map String CSV -> Either String CSV
@@ -489,13 +546,12 @@ runQueryFile filePath = do
         else return $ Left $ "Query file not found: " ++ filePath
 
 -- | Run a query on specific CSV files
+-- | Run a query on specific CSV files
 runQueryOnFiles :: String -> [FilePath] -> IO (Either String CSV)
 runQueryOnFiles queryStr _ = do
     let tokens = lexer queryStr
     case tokens of
         [] -> return $ Left "Empty query"
         _ -> do
-            let ast = parseQuery tokens
-            -- Here we would need to modify the query processing to use the provided files
-            -- This is somewhat complex as you'd need to map table names to these files
-            processQuery ast
+            let queries = parseQueries tokens
+            runQueries queries Map.empty  -- Start with empty tables

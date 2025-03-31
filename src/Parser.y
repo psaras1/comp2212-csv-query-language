@@ -5,7 +5,7 @@ import Lexer
 import Data.Maybe (fromMaybe)
 }
 
-%name parseQuery
+%name parseQueryList QueryList
 %tokentype { PosnToken }
 %error { parseError }
 
@@ -77,8 +77,11 @@ import Data.Maybe (fromMaybe)
 %%
 
 -- Main query structure
-Query : QueryExpr ';'                      { $1 }
-      | QueryExpr                          { $1 }
+QueryList : Query                    { [$1] }
+          | QueryList Query          { $2 : $1 }
+
+Query : QueryExpr ';'                { $1 }
+      | QueryExpr                    { $1 }
       
 -- Split out union operations for clarity
 QueryExpr : SimpleQuery                    { $1 }
@@ -136,7 +139,7 @@ Project : PROJECT ColIndices FROM TableExpr
         | PROJECT ColIndices FROM TableExpr BY ColIndices
                                            { ProjectGroupBy $2 $4 $6 }
         | PROJECT ColIndices FROM TableExpr WHERE Condition
-                                           { PermuteWhere $2 $4 $6 }
+                                           { ProjectWhere $2 $4 $6 }
 
 -- RENAME operation
 RenameOperation : RENAME ColIndex TO identifier FROM TableExpr
@@ -228,6 +231,10 @@ ExprList : Expr                              { [$1] }
          | ExprList ',' Expr                 { $1 ++ [$3] }
 
 {
+-- Helper function to convert the query list to a more usable form
+parseQueries :: [PosnToken] -> [QueryExpr]
+parseQueries = reverse . parseQueryList
+
 -- Error handling
 parseError :: [PosnToken] -> a
 parseError [] = error "Parse error: unexpected end of input"

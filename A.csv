@@ -1,5 +1,6 @@
-name,age,status,city
-Alice,25,active,London
-Bob,30,,New York
-Charlie,22,active,Paris
-Diana,35,inactive,Berlin
+id,name,age,department
+1,John,25,HR
+2,Mary,30,Engineering
+3,Robert,28,HR
+4,Patricia,35,Finance
+5,David,32,Engineering
