@@ -541,12 +541,7 @@ projectColumns columns sourceData resultData =
     resolveColumnValue _ _ (ConstantColumn str) = 
         str
 
--- | Helper for concatMap with Either monad
-concatMapM :: (a -> Either String [b]) -> [a] -> Either String [b]
-concatMapM f = foldl (\acc x -> do
-                          accResult <- acc
-                          xResult <- f x
-                          return (accResult ++ xResult)) (Right [])
+
 
 -- | Load and run a query file
 runQueryFile :: FilePath -> IO (Either String CSV)

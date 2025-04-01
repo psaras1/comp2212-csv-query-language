@@ -158,11 +158,17 @@ ColumnExprList : ColumnExpr                  { [$1] }
                | ColumnExprList ',' ColumnExpr
                                              { $1 ++ [$3] }
 
-ColumnExpr : ColIndex                { SimpleColumn $1 }
-           | ColIndex AS identifier  { ColumnAlias $1 $3 }
-           | Expr                    { ExprColumn $1 }
-           | Expr AS identifier      { ExprColumnAlias $1 $3 }
+ColumnExpr : SimpleColExpr          { $1 }
+           | ComplexExpr            { $1 }
 
+SimpleColExpr : ColIndex                { SimpleColumn $1 }
+              | ColIndex AS identifier  { ColumnAlias $1 $3 }
+
+ComplexExpr : ComplexExprNoAlias              { ExprColumn $1 }
+            | ComplexExprNoAlias AS identifier { ExprColumnAlias $1 $3 }
+
+ComplexExprNoAlias : ArithExpr               { $1 }
+                   | ParenExpr               { $1 }
 -- Table expressions
 TableExpr : TableTerm                        { $1 }
           | TableExpr JOIN TableTerm ON Condition
@@ -204,14 +210,16 @@ SimpleCondition : Expr '=' Expr              { Equals $1 $3 }
                 | EXISTS COL ColIndex        { ExistsCol $3 }
 
 -- Modified Expressions rule to handle column references directly
-Expr : COLREF ColIndex                      { ColRef $2 }
-     | ColIndex                             { ColRef $1 }  
-     | Literal                              { $1 }
-     | Expr '+' Expr                        { BinaryOp Add $1 $3 }
-     | Expr '-' Expr                        { BinaryOp Subtract $1 $3 }
-     | Expr '*' Expr                        { BinaryOp Multiply $1 $3 }
-     | Expr '/' Expr                        { BinaryOp Divide $1 $3 }
-     | ParenExpr                            { $1 }
+Expr : COLREF ColIndex              { ColRef $2 }
+     | ColIndex                     { ColRef $1 }
+     | Literal                      { $1 }
+     | ArithExpr                    { $1 }
+     | ParenExpr                    { $1 }
+     
+ArithExpr : Expr '+' Expr           { BinaryOp Add $1 $3 }
+          | Expr '-' Expr           { BinaryOp Subtract $1 $3 }
+          | Expr '*' Expr           { BinaryOp Multiply $1 $3 }
+          | Expr '/' Expr           { BinaryOp Divide $1 $3 }
 
 ParenExpr : '(' Expr ')'                     { $2 }
 
