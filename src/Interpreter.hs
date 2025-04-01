@@ -185,13 +185,18 @@ evalSelect cols table whereClause tables = do
     let filteredData = case whereClause of
             Nothing -> tableData
             Just cond -> filter (rowMatchesCondition cond tableData) tableData
-    columns <- resolveColumnList cols tableData
-    return $ projectColumns columns tableData filteredData
+    columnResolutions <- resolveColumnList cols tableData
+    return $ projectColumns columnResolutions tableData filteredData
 
 -- | Evaluate a SELECT DISTINCT query (removes duplicates)
 evalSelectDistinct :: ColumnList -> TableExpr -> Maybe Condition -> Map.Map String CSV -> Either String CSV
 evalSelectDistinct cols table whereClause tables = do
-    result <- evalSelect cols table whereClause tables
+    tableData <- evalTableExpr table tables
+    let filteredData = case whereClause of
+            Nothing -> tableData
+            Just cond -> filter (rowMatchesCondition cond tableData) tableData
+    columnResolutions <- resolveColumnList cols tableData
+    let result = projectColumns columnResolutions tableData filteredData
     return $ nub result
 
 -- | Evaluate a CARTESIAN PRODUCT operation
@@ -455,10 +460,26 @@ evalExpr expr csv row = case expr of
         let val1 = evalExpr expr1 csv row
             val2 = evalExpr expr2 csv row
         in case op of
-            Add -> val1 ++ val2  -- String concatenation
-            Subtract -> error "Subtraction not supported for strings"
-            Multiply -> error "Multiplication not supported for strings"
-            Divide -> error "Division not supported for strings"
+            Add -> 
+                -- Try to parse as numbers first
+                case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+                    ([(n1, "")], [(n2, "")]) -> show (n1 + n2) -- Numerical addition
+                    _ -> val1 ++ val2  -- String concatenation fallback
+            Subtract -> 
+                case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+                    ([(n1, "")], [(n2, "")]) -> show (n1 - n2)
+                    _ -> error "Subtraction requires numeric values"
+            Multiply -> 
+                case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+                    ([(n1, "")], [(n2, "")]) -> show (n1 * n2)
+                    _ -> error "Multiplication requires numeric values"
+            Divide -> 
+                case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+                    ([(n1, "")], [(n2, "")]) -> 
+                        if n2 == 0 
+                            then error "Division by zero"
+                            else show (n1 / n2)
+                    _ -> error "Division requires numeric values"
 
 -- | Resolve a column index to an actual integer index
 resolveColIndex :: CSV -> [String] -> ColIndex -> Int
@@ -481,28 +502,44 @@ findIndex f = findIndexHelper 0
         | otherwise = findIndexHelper (i+1) xss
 
 -- | Resolve column list to actual column indices
-resolveColumnList :: ColumnList -> CSV -> Either String [Int]
+resolveColumnList :: ColumnList -> CSV -> Either String [ColumnResolution]
 resolveColumnList cols csv = case cols of
     AllColumns ->
         if null csv
             then Right []
-            else Right [0..(length (head csv) - 1)]
+            else Right [DirectColumn i | i <- [0..(length (head csv) - 1)]]
     SpecificColumns colExprs ->
-        let resolveColExpr (SimpleColumn colIdx) = Right [resolveColIndex csv [] colIdx]
-            resolveColExpr (ColumnAlias colIdx _) = Right [resolveColIndex csv [] colIdx]
-            resolveColExpr (StringColumn _) = Right [-1]
-        in concatMapM resolveColExpr colExprs
+        mapM (resolveColExpr csv) colExprs
+
+resolveColExpr :: CSV -> ColumnExpr -> Either String ColumnResolution
+resolveColExpr csv (SimpleColumn colIdx) = 
+    Right $ DirectColumn $ resolveColIndex csv [] colIdx
+resolveColExpr csv (ColumnAlias colIdx _) = 
+    Right $ DirectColumn $ resolveColIndex csv [] colIdx
+resolveColExpr _ (StringColumn str) = 
+    Right $ ConstantColumn str
+resolveColExpr _ (ExprColumn expr) = 
+    Right $ ExpressionColumn expr
+resolveColExpr _ (ExprColumnAlias expr _) = 
+    Right $ ExpressionColumn expr
 
 -- | Project columns from source data to result data
-projectColumns :: [Int] -> CSV -> CSV -> CSV
-projectColumns columns _ resultData =
-    let projectRow row = map getColValue columns
-          where
-            getColValue idx
-              | idx >= 0 && idx < length row = row !! idx
-              | idx == -1 = ""  -- This is a placeholder - you'll need more logic here
-              | otherwise = ""
-    in map projectRow resultData
+projectColumns :: [ColumnResolution] -> CSV -> CSV -> CSV
+projectColumns columns sourceData resultData =
+    map (projectRow sourceData) resultData
+  where
+    projectRow :: CSV -> Row -> Row
+    projectRow source row = 
+        map (resolveColumnValue source row) columns
+    
+    resolveColumnValue :: CSV -> Row -> ColumnResolution -> String
+    resolveColumnValue _ row (DirectColumn idx)
+        | idx >= 0 && idx < length row = row !! idx
+        | otherwise = ""
+    resolveColumnValue source row (ExpressionColumn expr) = 
+        evalExpr expr source row
+    resolveColumnValue _ _ (ConstantColumn str) = 
+        str
 
 -- | Helper for concatMap with Either monad
 concatMapM :: (a -> Either String [b]) -> [a] -> Either String [b]
@@ -531,3 +568,9 @@ runQueryOnFiles queryStr _ = do
         _ -> do
             let queries = parseQueries tokens
             runQueries queries Map.empty  -- Start with empty tables
+
+data ColumnResolution = 
+    DirectColumn Int           -- Index of a direct column reference
+  | ExpressionColumn Expr      -- Expression to evaluate for each row
+  | ConstantColumn String      -- Constant string value
+  deriving (Show)

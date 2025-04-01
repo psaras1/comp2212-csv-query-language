@@ -158,8 +158,10 @@ ColumnExprList : ColumnExpr                  { [$1] }
                | ColumnExprList ',' ColumnExpr
                                              { $1 ++ [$3] }
 
-ColumnExpr : ColIndex                        { SimpleColumn $1 }
-           | ColIndex AS identifier          { ColumnAlias $1 $3 }
+ColumnExpr : ColIndex                { SimpleColumn $1 }
+           | ColIndex AS identifier  { ColumnAlias $1 $3 }
+           | Expr                    { ExprColumn $1 }
+           | Expr AS identifier      { ExprColumnAlias $1 $3 }
 
 -- Table expressions
 TableExpr : TableTerm                        { $1 }
@@ -272,7 +274,9 @@ data ColumnList =
 data ColumnExpr = 
     SimpleColumn ColIndex
   | ColumnAlias ColIndex String
-  | StringColumn String 
+  | StringColumn String
+  | ExprColumn Expr
+  | ExprColumnAlias Expr String
   deriving (Show)
 
 -- Table expressions
