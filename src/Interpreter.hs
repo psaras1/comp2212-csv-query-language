@@ -103,6 +103,7 @@ getTableNames query = case query of
     LeftMerge table1 _ table2 -> getTablesFromExpr table1 ++ getTablesFromExpr table2
     Project _ table -> getTablesFromExpr table
     ProjectGroupBy _ table _ -> getTablesFromExpr table
+    ProjectWhere _ table _ -> getTablesFromExpr table
     RenameColumn _ _ table -> getTablesFromExpr table
     CreateTable _ subQuery -> getTableNames subQuery
     Union query1 query2 -> getTableNames query1 ++ getTableNames query2
@@ -156,6 +157,7 @@ evalQuery query tables = case query of
     LeftMerge table1 colIdx table2 -> evalLeftMerge table1 colIdx table2 tables
     Project cols table -> evalProject cols table tables
     ProjectGroupBy cols table groupCols -> evalProjectGroupBy cols table groupCols tables
+    ProjectWhere cols table cond -> evalProjectWhere cols table cond tables
     RenameColumn colIdx newName table -> evalRenameColumn colIdx newName table tables
     CreateTable _ subQuery -> do
         result <- evalQuery subQuery tables
@@ -163,6 +165,20 @@ evalQuery query tables = case query of
     Union query1 query2 -> evalUnion query1 query2 tables
 
 
+evalProjectWhere :: [ColIndex] -> TableExpr -> Condition -> Map.Map String CSV -> Either String CSV
+evalProjectWhere colIndices table cond tables = do
+    tableData <- evalTableExpr table tables
+    -- Filter rows based on the condition
+    let filteredData = filter (rowMatchesCondition cond tableData) tableData
+    -- Then project the columns
+    let columnIndices = map (resolveColIndex tableData []) colIndices
+    -- Guard against invalid column indices
+    if null tableData
+        then Right []
+        else if any (< 0) columnIndices || any (>= length (head tableData)) columnIndices
+            then Left "Column index out of bounds"
+            else let projectRow row = [row !! idx | idx <- columnIndices]
+                 in Right $ map projectRow filteredData
 
 
 -- | Evaluate a UNION operation
