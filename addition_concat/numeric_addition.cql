@@ -1,0 +1,1 @@
+SELECT #1, #3 + #2 + 5 FROM A WHERE EXISTS COL #1;
