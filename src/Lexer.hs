@@ -28195,7 +28195,7 @@ alex_action_54 = \p s -> PT p TokenNotEq
 alex_action_55 = \p s -> PT p TokenHash
 alex_action_56 = \p s -> PT p (TokenIdentifier s)
 alex_action_57 = \p s -> PT p (TokenString (strip s))
-alex_action_58 = \p s -> PT p (TokenInt (read s))
+alex_action_58 = \p s -> PT p (TokenInt (read s :: Int))
 
 #define ALEX_NOPRED 1
 -- -----------------------------------------------------------------------------

@@ -456,10 +456,30 @@ evalCondition cond csv row = case cond of
     Or cond1 cond2 -> evalCondition cond1 csv row || evalCondition cond2 csv row
     Equals expr1 expr2 -> evalExpr expr1 csv row == evalExpr expr2 csv row
     NotEquals expr1 expr2 -> evalExpr expr1 csv row /= evalExpr expr2 csv row
-    LessThan expr1 expr2 -> evalExpr expr1 csv row < evalExpr expr2 csv row
-    GreaterThan expr1 expr2 -> evalExpr expr1 csv row > evalExpr expr2 csv row
-    LessEquals expr1 expr2 -> evalExpr expr1 csv row <= evalExpr expr2 csv row
-    GreaterEquals expr1 expr2 -> evalExpr expr1 csv row >= evalExpr expr2 csv row
+    LessThan expr1 expr2 -> 
+        let val1 = evalExpr expr1 csv row
+            val2 = evalExpr expr2 csv row
+        in case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+            ([(n1, "")], [(n2, "")]) -> n1 < n2
+            _ -> val1 < val2  -- fallback to string comparison
+    GreaterThan expr1 expr2 -> 
+        let val1 = evalExpr expr1 csv row
+            val2 = evalExpr expr2 csv row
+        in case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+            ([(n1, "")], [(n2, "")]) -> n1 > n2
+            _ -> val1 > val2  -- fallback to string comparison
+    LessEquals expr1 expr2 -> 
+        let val1 = evalExpr expr1 csv row
+            val2 = evalExpr expr2 csv row
+        in case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+            ([(n1, "")], [(n2, "")]) -> n1 <= n2
+            _ -> val1 <= val2  -- fallback to string comparison
+    GreaterEquals expr1 expr2 -> 
+        let val1 = evalExpr expr1 csv row
+            val2 = evalExpr expr2 csv row
+        in case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
+            ([(n1, "")], [(n2, "")]) -> n1 >= n2
+            _ -> val1 >= val2  -- fallback to string comparison
     IsNull expr -> evalExpr expr csv row == ""
     IsNotNull expr -> evalExpr expr csv row /= ""
     InList expr list -> evalExpr expr csv row `elem` map (\e -> evalExpr e csv row) list

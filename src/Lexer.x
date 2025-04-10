@@ -78,7 +78,7 @@ tokens :-
   -- Identifiers and literals
   $alpha [$alphaNum\_]*         { \p s -> PT p (TokenIdentifier s) }
   \" ([^\"]|(\\\"))* \"         { \p s -> PT p (TokenString (strip s)) }
-  $digit+                       { \p s -> PT p (TokenInt (read s)) }
+  $digit+                       { \p s -> PT p (TokenInt (read s :: Int)) }
 
 {
 -- Strip quotes from string literals
