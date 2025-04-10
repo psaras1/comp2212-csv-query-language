@@ -41,6 +41,7 @@ tokens :-
   PROJECT                       { \p s -> PT p TokenProject }
   COLREF                        { \p s -> PT p TokenColRef }
   UNION                         { \p s -> PT p TokenUnion }
+  CONCAT                        { \p s -> PT p TokenConcat }
   
 
   
@@ -72,6 +73,7 @@ tokens :-
   "<="                          { \p s -> PT p TokenLessEq }
   "!="                          { \p s -> PT p TokenNotEq }
   "#"                           { \p s -> PT p TokenHash }
+-- "||"                          { \p s -> PT p TokenConcat }
   
   -- Identifiers and literals
   $alpha [$alphaNum\_]*         { \p s -> PT p (TokenIdentifier s) }
@@ -114,6 +116,7 @@ data Token =
   TokenProject |
   TokenColRef |
   TokenUnion |
+  TokenConcat | --new token for string concat
   
   -- CSV-specific functions and operations
   TokenBy |

@@ -4,7 +4,7 @@ A domain-specific programming language for querying CSV files.
 
 ## Overview
 
-This language provides a SQL-inspired syntax for querying and manipulating CSV data. 
+This language provides a SQL-inspired syntax for querying and manipulating CSV data.
 The interpreter reads queries written in CQL, processes CSV files, and outputs the results.
 
 ## Features
@@ -67,5 +67,5 @@ The example query files in this repository correspond to the following tasks:
 - `t1.cql`: Cartesian product of tables A and B
 - `t2.cql`: Permutation, drop, and matching
 - `t3.cql`: Existence check
-- `t4.cql`: Copying and constants 
+- `t4.cql`: Copying and constants
 - `t5.cql`: Left merge on first column

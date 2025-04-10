@@ -44,6 +44,7 @@ import Data.Maybe (fromMaybe)
   MATCH       { PT _ TokenMatch }
   COLREF      { PT _ TokenColRef }
   UNION       { PT _ TokenUnion }
+  CONCAT      { PT _ TokenConcat }
   '='         { PT _ TokenEq }
   ','         { PT _ TokenComma }
   ';'         { PT _ TokenSemicolon }
@@ -61,6 +62,7 @@ import Data.Maybe (fromMaybe)
   '>='        { PT _ TokenGreaterEq }
   '<='        { PT _ TokenLessEq }
   '!='        { PT _ TokenNotEq }
+  '||'        { PT _ TokenConcat }
   '#'         { PT _ TokenHash }
   identifier  { PT _ (TokenIdentifier $$) }
   string      { PT _ (TokenString $$) }
@@ -71,7 +73,7 @@ import Data.Maybe (fromMaybe)
 %left OR
 %left AND
 %nonassoc '=' '!=' '<' '>' '<=' '>='
-%left '+' '-'
+%left '+' '-' '||'
 %left '*' '/'
 
 %%
@@ -94,11 +96,17 @@ SimpleQuery : SelectQuery                  { $1 }
             | CopyAndConstants             { $1 }
             | LeftMerge                    { $1 }
             | Project                      { $1 }
-            | RenameOperation              { $1 }  
+            | RenameOperation              { $1 }
             | CreateOperation              { $1 }
             | ParenQuery                   { $1 }
+            | ConcatOperation               { $1 }
 
 ParenQuery : '(' QueryExpr ')'             { $2 }
+
+-- CONCAT operation
+ConcatOperation : CONCAT '(' Expr ',' Expr ')' FROM TableExpr OptionalWhere
+                                            { ConcatOp $3 $5 $8 $9 }
+
 
 -- SELECT query format
 SelectQuery : SELECT ColumnList FROM TableExpr OptionalWhere
@@ -216,10 +224,13 @@ Expr : COLREF ColIndex              { ColRef $2 }
      | ArithExpr                    { $1 }
      | ParenExpr                    { $1 }
      
-ArithExpr : Expr '+' Expr           { BinaryOp Add $1 $3 }
-          | Expr '-' Expr           { BinaryOp Subtract $1 $3 }
-          | Expr '*' Expr           { BinaryOp Multiply $1 $3 }
-          | Expr '/' Expr           { BinaryOp Divide $1 $3 }
+ArithExpr : Expr '+' Expr                    { BinaryOp Add $1 $3 }
+          | Expr '-' Expr                    { BinaryOp Subtract $1 $3 }
+          | Expr '*' Expr                    { BinaryOp Multiply $1 $3 }
+          | Expr '/' Expr                    { BinaryOp Divide $1 $3 }
+          | Expr '||' Expr                   { BinaryOp Concat $1 $3} -- new (infix form)
+          | CONCAT '(' Expr ',' Expr ')'     { BinaryOp Concat $3 $5} -- new (function form)
+
 
 ParenExpr : '(' Expr ')'                     { $2 }
 
@@ -271,6 +282,7 @@ data QueryExpr =
   | RenameColumn ColIndex String TableExpr 
   | CreateTable String QueryExpr  
   | Union QueryExpr QueryExpr 
+  | ConcatOp Expr Expr TableExpr (Maybe Condition)
   deriving (Show)
 
 -- Column selection
@@ -327,6 +339,7 @@ data BinOp =
   | Subtract
   | Multiply
   | Divide
+  | Concat   --new binary operation
   deriving (Show)
 
 -- Column references

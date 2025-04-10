@@ -107,6 +107,7 @@ getTableNames query = case query of
     RenameColumn _ _ table -> getTablesFromExpr table
     CreateTable _ subQuery -> getTableNames subQuery
     Union query1 query2 -> getTableNames query1 ++ getTableNames query2
+    ConcatOp _ _ table _ -> getTablesFromExpr table
 
 -- Helper to extract table names from table expressions
 getTablesFromExpr :: TableExpr -> [String]
@@ -163,7 +164,21 @@ evalQuery query tables = case query of
         result <- evalQuery subQuery tables
         Right result  -- Return the result of the subquery
     Union query1 query2 -> evalUnion query1 query2 tables
+    -- ConcatOp query case
+    ConcatOp expr1 expr2 table whereClause -> evalConcatOp expr1 expr2 table whereClause tables
 
+-- | Evaluate a CONCAT operation
+evalConcatOp :: Expr -> Expr -> TableExpr -> Maybe Condition -> Map.Map String CSV -> Either String CSV
+evalConcatOp expr1 expr2 table whereClause tables = do
+        tableData <- evalTableExpr table tables
+        let filteredData = case whereClause of
+                                Nothing -> tableData
+                                Just cond -> filter (rowMatchesCondition cond tableData) tableData
+        
+        -- evaluate and concatenate both expressions for each row
+        let result = map(\row -> [evalExpr expr1 tableData row ++ evalExpr expr2 tableData row]) filteredData
+
+        Right result
 
 evalProjectWhere :: [ColIndex] -> TableExpr -> Condition -> Map.Map String CSV -> Either String CSV
 evalProjectWhere colIndices table cond tables = do
@@ -480,7 +495,7 @@ evalExpr expr csv row = case expr of
                 -- Try to parse as numbers first
                 case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
                     ([(n1, "")], [(n2, "")]) -> show (n1 + n2) -- Numerical addition
-                    _ -> val1 ++ val2  -- String concatenation fallback
+                    _ -> val1 ++ val2 -- string concatenation fallback
             Subtract -> 
                 case (reads val1 :: [(Double, String)], reads val2 :: [(Double, String)]) of
                     ([(n1, "")], [(n2, "")]) -> show (n1 - n2)
@@ -496,6 +511,10 @@ evalExpr expr csv row = case expr of
                             then error "Division by zero"
                             else show (n1 / n2)
                     _ -> error "Division requires numeric values"
+            Concat -> 
+                val1 ++ val2 -- String concatenation
+
+
 
 -- | Resolve a column index to an actual integer index
 resolveColIndex :: CSV -> [String] -> ColIndex -> Int
