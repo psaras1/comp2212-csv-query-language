@@ -377,7 +377,7 @@ evalProject colIndices table tables = do
                 else let projectRow row = [row !! idx | idx <- columnIndices]
                      in Right $ map projectRow tableData
 
--- | Evaluate a PROJECT GROUP BY operation
+-- | Evaluate a PROJECT GROUP BY operation with aggregation
 evalProjectGroupBy :: [ColIndex] -> TableExpr -> [ColIndex] -> Map.Map String CSV -> Either String CSV
 evalProjectGroupBy projCols table groupCols tables = do
     tableData <- evalTableExpr table tables
@@ -388,13 +388,21 @@ evalProjectGroupBy projCols table groupCols tables = do
     -- Group rows by the values in the groupBy columns
     let groupedData = groupByColumns groupIndices tableData
 
-    -- For each group, project the specified columns
-    let result = map (\group ->
-                    let rep = head group -- Take the first row as representative
-                    in [rep !! idx | idx <- projIndices]
+    -- For each group, compute aggregates for non-grouping columns
+    let result = map (\group -> 
+                    let groupKeys = [head group !! idx | idx <- groupIndices]
+                        aggregates = [computeAggregate idx group | idx <- projIndices, not (idx `elem` groupIndices)]
+                    in groupKeys ++ aggregates
                 ) groupedData
 
     Right result
+
+-- | Compute aggregate value for a column in a group
+computeAggregate :: Int -> CSV -> String
+computeAggregate colIdx rows = 
+    let values = map (!! colIdx) rows
+        numValues = map (\x -> read x :: Double) values
+    in show (sum numValues / fromIntegral (length numValues))  -- Using average as default aggregate
 
 -- | Group rows by multiple column values
 groupByColumns :: [Int] -> CSV -> [CSV]
