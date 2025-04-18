@@ -1,1 +1,0 @@
-PROJECT * GROUP BY #3 A
