@@ -1,0 +1,11 @@
+id,name,category,price,in_stock
+1,Laptop,Electronics,1200,yes
+2,Smartphone,Electronics,800,yes
+3,Tablet,Electronics,500,no
+4,Television,Electronics,1500,yes
+5,T-shirt,Clothing,25,yes
+6,Jeans,Clothing,50,yes
+7,Hat,Clothing,15,no
+8,Book,Media,20,yes
+9,Magazine,Media,8,no
+10,Movie,Media,15,yes
