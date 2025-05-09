@@ -1,1 +1,0 @@
-LEFT MERGE A ON #1 WITH B 

@@ -1,0 +1,67 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "CQL Programming Language",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+		    "include": "#comparison"
+		},
+		{
+			"include": "#numbers-with-hash"
+		}
+
+	],
+	"repository": {
+		"comments": {
+    		"patterns": [{
+        		"name": "comment.line.double-dash.cql",
+        		"match": "--.*"
+    		},
+			{
+				"name": "comment.block.cql",
+				"begin": "/\\*",
+				"end": "\\*/"
+			}]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.cql",
+				"match": "\\b(CONCAT|LEFT MERGE|SELECT DISTINCT|SELECT|FROM|PROJECT|PERMUTE|CARTESIAN PRODUCT|DROP|EXISTS COL|COPY|CREATE|AS|RENAME|UNION|JOIN)\\b"
+			},
+			{
+				"name": "keyword.other.cql",
+				"match": "\\b(WHERE|WITH|CONSTANT|ON|WITH|BY|TO|ROW|AND|OR|COLREF|NOT|EMPTY|MATCH|IS|IN|NULL)\\b"
+			},
+			{
+				"name": "keyword.operator.cql",
+				"match": "<=|>=|=|!|\\*|\\+|<|>|-|/"
+			}
+   			
+		]
+		},	
+		"strings": {
+			"patterns": [{
+			"name": "string.quoted.double.cql",
+			"begin": "\"",
+			"end": "\""
+			}
+		]
+		},
+		"numbers-with-hash": {
+			"patterns": [{
+				"name": "constant.numeric.hash-number.cql",
+				"match": "#\\d+"
+			}]
+		}
+	},
+	"scopeName": "source.cql"
+}
+

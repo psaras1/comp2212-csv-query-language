@@ -1,1 +1,0 @@
-SELECT #1, #3 + #2 FROM A;

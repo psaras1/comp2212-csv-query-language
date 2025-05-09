@@ -1,0 +1,48 @@
+{
+    "editor.tokenColorCustomizations": {
+    "textMateRules": [
+        {
+            "scope": "constant.numeric.hash-number.cql",
+            "settings": {
+                "foreground": "#ff009d"
+            }
+        },
+        {
+            "scope": "keyword.control.cql",
+            "settings": {
+                "foreground": "#008cff"
+            }
+        },
+        {
+            "scope": "keyword.other.cql",
+            "settings": {
+                "foreground": "#f8a13d"
+            }
+        },
+        {
+            "scope": "keyword.operator.cql",
+            "settings": {
+                "foreground": "#bd3df8"
+            }
+        },
+        {
+            "scope": "string.quoted.double.cql",
+            "settings": {
+                "foreground": "#14bf47"
+            }
+        },
+        {
+            "scope": "comment.line.double-dash.cql",
+            "settings": {
+                "foreground": "#13b79e"
+            }
+        },
+        {
+            "scope": "comment.block.cql",
+            "settings": {
+                "foreground": "#13b79e"
+            }
+        }
+    ]
+}
+}

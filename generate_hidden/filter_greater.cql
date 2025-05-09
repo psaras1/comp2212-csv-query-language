@@ -1,1 +1,0 @@
-SELECT * FROM A WHERE #3 > 10;
