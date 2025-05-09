@@ -69,3 +69,9 @@ The example query files in this repository correspond to the following tasks:
 - `t3.cql`: Existence check
 - `t4.cql`: Copying and constants
 - `t5.cql`: Left merge on first column
+- `t6.cql` : Multiway Cartesian Product
+- `Task 7`: Paired Composition
+- `Task 8`: Right Merge on Last Column
+- `Task 9`: Paths of length three
+- `Task 10`: Matching Pairs
+
