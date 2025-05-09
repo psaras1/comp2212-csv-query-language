@@ -64,12 +64,12 @@ LEFT MERGE P ON #1 WITH Q;
 
 The example query files in this repository correspond to the following tasks:
 
-- `t1.cql`: Cartesian product of tables A and B
-- `t2.cql`: Permutation, drop, and matching
-- `t3.cql`: Existence check
-- `t4.cql`: Copying and constants
-- `t5.cql`: Left merge on first column
-- `t6.cql` : Multiway Cartesian Product
+- `Task 1`: Cartesian product of tables A and B
+- `Task 2`: Permutation, drop, and matching
+- `Task 3`: Existence check
+- `Task 4`: Copying and constants
+- `Task 5`: Left merge on first column
+- `Task 6` : Multiway Cartesian Product
 - `Task 7`: Paired Composition
 - `Task 8`: Right Merge on Last Column
 - `Task 9`: Paths of length three
